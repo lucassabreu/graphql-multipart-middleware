@@ -1,3 +1,8 @@
+// This packages provide a implementation of the graphql multipart request spec created by [@jaydenseric](https://github.com/jaydenseric) to provide support for handling file uploads in a GraphQL server, [click here to see the spec](https://github.com/jaydenseric/graphql-multipart-request-spec).
+//
+// Using the methods `graphqlmultipart.NewHandler` or `graphqlmultipart.NewMiddlewareWrapper` you will be abble to wrap your GraphQL handler and so every request made with the `Content-Type`: `multipart/form-data` will be handled by this package (using a provided GraphQL schema), and other `Content-Types` will be directed to your handler.
+//
+// The package also provide a scalar for the uploaded content called `graphqlmultipart.Upload`, when used it will populate your `InputObjects` or arguments with a `*multipart.FileHeader` for the uploaded file that can be used inside your queries/mutations.
 package graphqlmultipart
 
 import (
