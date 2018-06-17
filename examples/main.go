@@ -22,7 +22,10 @@ func main() {
 	port := os.Getenv("PORT")
 
 	fmt.Println("Now server is running on port " + port)
-	fmt.Println("Test with Get      : curl -g 'http://localhost:" + port + "/graphql?query={hero{name}}'")
+	fmt.Println(`Test with: curl -g 'http://localhost:8000/graphql'
+	-F 'operations={"query":"query($file:Upload) { upload(file: $file){ filename, size, headers {name, values} } }","variables":{"file":null}}'
+	-F 'map={"file":["variables.file"]}'
+	-F file=@main.go`)
 
 	http.ListenAndServe(":"+port, h)
 }
