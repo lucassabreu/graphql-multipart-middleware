@@ -174,7 +174,7 @@ func (m MultipartHandler) execute(op operationField, fMap map[string][]string, r
 
 			vars, ok := injectFile(
 				r.MultipartForm.File[f][0],
-				op.Variables,
+				*op.Variables,
 				p[len(op.mapPrefix):],
 			)
 

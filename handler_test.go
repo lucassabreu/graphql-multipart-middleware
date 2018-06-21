@@ -194,3 +194,70 @@ func TestHandlerShouldValidateRequest(t *testing.T) {
 		})
 	}
 }
+
+func TestHandler_SchemaCanAccessUploads(t *testing.T) {
+	type test struct {
+		req   *http.Request
+		respo string
+	}
+
+	cases := map[string]test{
+		"simple": test{
+			req: newFileUploadRequest(
+				map[string]string{
+					"operations": `{
+						"query":"query($file:Upload) { upload(file: $file){ filename } }",
+						"variables":{"file":null}
+					}`,
+					"map": `{"file":["variables.file"]}`,
+				},
+				map[string]string{"file": "handler.go"},
+			),
+			respo: `{"data":{"upload":{"filename":"handler.go"}}}`,
+		},
+		"batching": test{
+			req: newFileUploadRequest(
+				map[string]string{
+					"operations": `[
+						{
+							"query":"query ($file: Upload){ upload(file:$file){filename} }",
+							"variables":{"file":null}
+						},
+						{
+							"query":"query ($other: Upload, $file: Upload) { other: upload(file:$other) {filename}, file:upload(file:$file) {filename} }",
+							"variables":{"other":null,"file":null}
+						}
+					]`,
+					"map": `{"file":["0.variables.file","1.variables.file"],"other_file":["1.variables.other"]}`,
+				},
+				map[string]string{"file": "handler.go", "other_file": "handler.go"},
+			),
+			respo: `[
+				{"data":{"upload":{"filename":"handler.go"}}},
+				{
+					"data":{
+						"other":{"filename":"handler.go"},
+						"file":{"filename":"handler.go"}
+					}
+				}
+			]`,
+		},
+	}
+
+	mh := graphqlmultipart.NewHandler(
+		&testutil.Schema,
+		1*1024,
+		http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Write([]byte("should not have forwarded the request"))
+		}),
+	)
+
+	for name, test := range cases {
+		t.Run(name, func(t *testing.T) {
+			resp := httptest.NewRecorder()
+			mh.ServeHTTP(resp, test.req)
+			body, _ := ioutil.ReadAll(resp.Result().Body)
+			require.JSONEq(t, string(body), test.respo)
+		})
+	}
+}
