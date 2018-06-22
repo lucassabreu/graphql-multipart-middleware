@@ -1,0 +1,22 @@
+language: go
+
+go:
+- 1.9.x
+- 1.10.x
+- tip
+
+script:
+- make install
+- make coverage
+
+after_success:
+- make send-statistics commit=$TRAVIS_COMMIT
+
+notifications:
+  email:
+    on_success: never
+    on_failure: always
+
+env:
+  global:
+    secure: RW12+yXeYPkvpYnVO1MiLVyTW3LdBqwL5ZgnVoSmDfIAkySmViXsGUji5/nmAWaIWxOqAbOGHeJPRtM6cCUAKSk6kibPTW+mYNWxHaT0j81MRonrFY/3MnPB05JOjyr13zIdwhgsqXvToUSF615lLoSoHuhLlcH+mJR2PF2svav6rkyIrzcPaIz/mstEOQgsVceOY6PQobSRaEh6bSaUDgnCiklNhzgrGdh/idhBft5wD7N07UQ5YQICAGpV3MX5B9HbD2NtCPvxGVDwa8huKP05YcJJ+pKc4BxJLpLdxVE8jgFZ8eE0H6ZmkGrhJHpy2aT053M0P9ctk/JopuvxZHe82FiJnlBxdL3p+k0Cb3bi6JqoDzivKRT6A5G6fM/DeJckU+1dAssDsuCPGIKVH0G0D4fxfCGhG29ljNnsoGkvcAFyQu6XoeEeiDwwqrm80yMmHF8jndJqR0bjZmk7mnFbMCtzRCbwpp5mZQWV7dNgNC4zoWfdy/HraQUihThc4D9uyWvrTt6vw/c5Jz0PoI3dHJH3LEnIiOABCCd+s63Z876qLr/u0hgvfGbKi7qxocBHNdECNkpXKTiy9qZy5BDNP7bkom7ekmMkJdaxJc6HjAmZYTwi/gxrhTLvx6gr15yg8puE1C03XjE1egmnjs6riO4tqduWqdRtQb7y35s=

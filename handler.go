@@ -1,4 +1,4 @@
-// This packages provide a implementation of the graphql multipart request spec created by [@jaydenseric](https://github.com/jaydenseric) to provide support for handling file uploads in a GraphQL server, [click here to see the spec](https://github.com/jaydenseric/graphql-multipart-request-spec).
+// Package graphqlmultipart provide a implementation of the graphql multipart request spec created by [@jaydenseric](https://github.com/jaydenseric) to provide support for handling file uploads in a GraphQL server, [click here to see the spec](https://github.com/jaydenseric/graphql-multipart-request-spec).
 //
 // Using the methods `graphqlmultipart.NewHandler` or `graphqlmultipart.NewMiddlewareWrapper` you will be abble to wrap your GraphQL handler and so every request made with the `Content-Type`: `multipart/form-data` will be handled by this package (using a provided GraphQL schema), and other `Content-Types` will be directed to your handler.
 //
@@ -21,19 +21,26 @@ import (
 const specURL = "https://github.com/jaydenseric/graphql-multipart-request-spec/tree/v2.0.0"
 
 var (
-	failedToParseForm = "Failed to parse multipart form"
+	// FailedToParseFormMessage is shown when it is a multipart/form-data, but its invalid
+	FailedToParseFormMessage = "Failed to parse multipart form"
 
-	operationsFieldMissingMessage = fmt.Sprintf("Field \"operations\" was not found in the form (%s)", specURL)
+	// OperationsFieldMissingMessage is shown when the operations field is missing
+	OperationsFieldMissingMessage = fmt.Sprintf("Field \"operations\" was not found in the form (%s)", specURL)
 
-	mapFieldMissingMessage = fmt.Sprintf("Field \"map\" was not found in the form (%s)", specURL)
+	// MapFieldMissingMessage is shown when the map field is missing
+	MapFieldMissingMessage = fmt.Sprintf("Field \"map\" was not found in the form (%s)", specURL)
 
-	invalidMapFieldMessage = fmt.Sprintf("Field \"map\" format is not valid (%s)", specURL)
+	// InvalidMapFieldMessage is shown when the map field format is invalid
+	InvalidMapFieldMessage = fmt.Sprintf("Field \"map\" format is not valid (%s)", specURL)
 
-	invalidOperationsFieldMessage = fmt.Sprintf("Field \"operations\" format is not valid (%s)", specURL)
+	// InvalidOperationsFieldMessage is shown when operations field format is not valid
+	InvalidOperationsFieldMessage = fmt.Sprintf("Field \"operations\" format is not valid (%s)", specURL)
 
-	missingFileMessage = fmt.Sprintf("Field %%[1]s is missing, but exists in the map association (%s)", specURL)
+	// MissingFileMessage is shown when a file is mapped, but not sent
+	MissingFileMessage = fmt.Sprintf("File \"%%[1]s\" is missing, but exists in the map association (%s)", specURL)
 
-	invalidMapPathMessage = fmt.Sprintf("Invalid mapping path \"%%[1]s\" for file %%[2]s (%s)", specURL)
+	// InvalidMapPathMessage is shown when is not possible to find or populate the variable path
+	InvalidMapPathMessage = fmt.Sprintf("Invalid mapping path \"%%[1]s\" for file %%[2]s (%s)", specURL)
 )
 
 // MultipartHandler implements the specification for handling multipart/form-data
@@ -64,9 +71,9 @@ func NewMiddlewareWrapper(s *graphql.Schema, maxMemory int64) func(next http.Han
 }
 
 type operationField struct {
-	Query         string                 `json:"query"`
-	Variables     map[string]interface{} `json:"variables"`
-	OperationName string                 `json:"operationName"`
+	Query         string                  `json:"query"`
+	Variables     *map[string]interface{} `json:"variables"`
+	OperationName string                  `json:"operationName"`
 	mapPrefix     string
 }
 
@@ -82,7 +89,7 @@ func (m MultipartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	if err := r.ParseMultipartForm(m.maxMemory); err != nil {
 		log.Printf("[MultipartHandler] Fail do parse multipart form: %s", err.Error())
-		writeError(w, failedToParseForm)
+		writeError(w, FailedToParseFormMessage)
 		return
 	}
 
@@ -92,31 +99,40 @@ func (m MultipartHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	var ok bool
 
 	if vs, ok = form.Value["operations"]; !ok {
-		writeError(w, operationsFieldMissingMessage)
+		writeError(w, OperationsFieldMissingMessage)
 		return
 	}
 	opsStr := vs[0]
 
 	if vs, ok = form.Value["map"]; !ok {
-		writeError(w, mapFieldMissingMessage)
+		writeError(w, MapFieldMissingMessage)
 		return
 	}
 	fileMapStr := vs[0]
 
 	fileMap := make(map[string][]string)
 	if err := json.Unmarshal([]byte(fileMapStr), &fileMap); err != nil {
-		writeError(w, invalidMapFieldMessage)
+		writeError(w, InvalidMapFieldMessage)
 		return
 	}
 
 	batching := true
-	ops := make([]operationField, 1)
+	ops := make([]operationField, 0)
 	if err := json.Unmarshal([]byte(opsStr), &ops); err != nil {
 		batching = false
-		if err = json.Unmarshal([]byte(opsStr), &ops[0]); err != nil {
-			writeError(w, invalidOperationsFieldMessage)
+		op := operationField{}
+		err = json.Unmarshal([]byte(opsStr), &op)
+		if err != nil || len(op.Query) == 0 || op.Variables == nil {
+			writeError(w, InvalidOperationsFieldMessage)
 			return
 		}
+
+		ops = append(ops, op)
+	}
+
+	if len(ops) == 0 {
+		writeError(w, InvalidOperationsFieldMessage)
+		return
 	}
 
 	results := make([]*graphql.Result, len(ops))
@@ -147,7 +163,7 @@ func (m MultipartHandler) execute(op operationField, fMap map[string][]string, r
 	for f, ps := range fMap {
 
 		if _, ok := r.MultipartForm.File[f]; !ok {
-			errs = append(errs, fmt.Errorf(fmt.Sprintf(missingFileMessage, f)))
+			errs = append(errs, fmt.Errorf(fmt.Sprintf(MissingFileMessage, f)))
 			continue
 		}
 
@@ -158,15 +174,15 @@ func (m MultipartHandler) execute(op operationField, fMap map[string][]string, r
 
 			vars, ok := injectFile(
 				r.MultipartForm.File[f][0],
-				op.Variables,
+				*op.Variables,
 				p[len(op.mapPrefix):],
 			)
 
 			if !ok {
-				errs = append(errs, fmt.Errorf(invalidMapPathMessage, p, f))
+				errs = append(errs, fmt.Errorf(InvalidMapPathMessage, p, f))
 				continue
 			}
-			op.Variables = vars.(map[string]interface{})
+			*op.Variables = vars.(map[string]interface{})
 		}
 	}
 
@@ -179,7 +195,7 @@ func (m MultipartHandler) execute(op operationField, fMap map[string][]string, r
 	return graphql.Do(graphql.Params{
 		Schema:         *m.Schema,
 		RequestString:  op.Query,
-		VariableValues: op.Variables,
+		VariableValues: *op.Variables,
 		OperationName:  op.OperationName,
 		Context:        r.Context(),
 	})
@@ -189,7 +205,7 @@ func injectFile(f *multipart.FileHeader, vars interface{}, path string) (interfa
 	var field, next string
 
 	field = path
-	if i := strings.Index(".", path); i != -1 {
+	if i := strings.Index(path, "."); i != -1 {
 		field = path[0:i]
 		next = path[i+1:]
 	}

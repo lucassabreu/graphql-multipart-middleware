@@ -35,6 +35,18 @@ var (
 		},
 	})
 
+	specialUploadInput = graphql.NewInputObject(graphql.InputObjectConfig{
+		Name: "SpecialUploadInput",
+		Fields: graphql.InputObjectConfigFieldMap{
+			"name": &graphql.InputObjectFieldConfig{
+				Type: graphql.NewNonNull(graphql.String),
+			},
+			"files": &graphql.InputObjectFieldConfig{
+				Type: graphql.NewList(graphqlmultipart.Upload),
+			},
+		},
+	})
+
 	// Schema is a simple schema that receives files and return its metadata
 	Schema graphql.Schema
 )
@@ -82,6 +94,73 @@ func init() {
 							i++
 						}
 						return r, nil
+					},
+				},
+				"uploads": &graphql.Field{
+					Name:        "UploadsQuery",
+					Description: "Receives a Uploaded file and returns its metadata",
+					Args: graphql.FieldConfigArgument{
+						"files": &graphql.ArgumentConfig{
+							Type: graphql.NewList(graphqlmultipart.Upload),
+						},
+					},
+					Type: graphql.NewList(uploadedType),
+					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+						files := p.Args["files"].([]interface{})
+						rs := make([]uploadedFile, len(files))
+						for i, f := range files {
+							file := f.(*multipart.FileHeader)
+							r := uploadedFile{
+								Filename: file.Filename,
+								Size:     file.Size,
+								Headers:  make([]uploadedHeader, len(file.Header)),
+							}
+
+							j := 0
+							for n, vs := range file.Header {
+								r.Headers[j] = uploadedHeader{
+									Name:   n,
+									Values: vs,
+								}
+								j++
+							}
+							rs[i] = r
+						}
+						return rs, nil
+					},
+				}, "specialUploads": &graphql.Field{
+					Name:        "SpecialUploadsQuery",
+					Description: "Receives a Uploaded file and returns its metadata",
+					Args: graphql.FieldConfigArgument{
+						"input": &graphql.ArgumentConfig{
+							Type: specialUploadInput,
+						},
+					},
+					Type: graphql.NewList(uploadedType),
+					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+						input := p.Args["input"].(map[string]interface{})
+
+						files := input["files"].([]interface{})
+						rs := make([]uploadedFile, len(files))
+						for i, f := range files {
+							file := f.(*multipart.FileHeader)
+							r := uploadedFile{
+								Filename: file.Filename,
+								Size:     file.Size,
+								Headers:  make([]uploadedHeader, len(file.Header)),
+							}
+
+							j := 0
+							for n, vs := range file.Header {
+								r.Headers[j] = uploadedHeader{
+									Name:   n,
+									Values: vs,
+								}
+								j++
+							}
+							rs[i] = r
+						}
+						return rs, nil
 					},
 				},
 			},
