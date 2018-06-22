@@ -262,6 +262,31 @@ func TestHandler_SchemaCanAccessUploads(t *testing.T) {
 				}
 			}`,
 		},
+		"complex_deeper": test{
+			req: newFileUploadRequest(
+				map[string]string{
+					"operations": `{
+						"query":"query($input: SpecialUploadInput) { u:specialUploads(input: $input){ filename } }",
+						"variables":{
+							"input":{
+								"name":"test",
+								"files":[null,null]
+							}
+						}
+					}`,
+					"map": `{"file":["variables.input.files.0","variables.input.files.1"]}`,
+				},
+				map[string]string{"file": "handler.go"},
+			),
+			respo: `{
+				"data":{
+					"u":[
+						{"filename":"handler.go"},
+						{"filename":"handler.go"}
+					]
+				}
+			}`,
+		},
 	}
 
 	mh := graphqlmultipart.NewHandler(
