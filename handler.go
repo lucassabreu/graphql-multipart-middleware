@@ -205,7 +205,7 @@ func injectFile(f *multipart.FileHeader, vars interface{}, path string) (interfa
 	var field, next string
 
 	field = path
-	if i := strings.Index(".", path); i != -1 {
+	if i := strings.Index(path, "."); i != -1 {
 		field = path[0:i]
 		next = path[i+1:]
 	}

@@ -84,6 +84,39 @@ func init() {
 						return r, nil
 					},
 				},
+				"uploads": &graphql.Field{
+					Name:        "UploadQuery",
+					Description: "Receives a Uploaded file and returns its metadata",
+					Args: graphql.FieldConfigArgument{
+						"files": &graphql.ArgumentConfig{
+							Type: graphql.NewList(graphqlmultipart.Upload),
+						},
+					},
+					Type: graphql.NewList(uploadedType),
+					Resolve: func(p graphql.ResolveParams) (interface{}, error) {
+						files := p.Args["files"].([]interface{})
+						rs := make([]uploadedFile, len(files))
+						for i, f := range files {
+							file := f.(*multipart.FileHeader)
+							r := uploadedFile{
+								Filename: file.Filename,
+								Size:     file.Size,
+								Headers:  make([]uploadedHeader, len(file.Header)),
+							}
+
+							j := 0
+							for n, vs := range file.Header {
+								r.Headers[j] = uploadedHeader{
+									Name:   n,
+									Values: vs,
+								}
+								j++
+							}
+							rs[i] = r
+						}
+						return rs, nil
+					},
+				},
 			},
 		}),
 	})
