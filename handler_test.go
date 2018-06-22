@@ -141,6 +141,16 @@ func TestHandlerShouldValidateRequest(t *testing.T) {
 			),
 			respo: getJSONError(graphqlmultipart.InvalidOperationsFieldMessage),
 		},
+		"invalid_map_field": test{
+			req: newFileUploadRequest(
+				map[string]string{
+					"operations": `{"query":"hero{id}","variables":{}}`,
+					"map":        "[]",
+				},
+				make(map[string]string),
+			),
+			respo: getJSONError(graphqlmultipart.InvalidMapFieldMessage),
+		},
 		"missing_file": test{
 			req: newFileUploadRequest(
 				map[string]string{
